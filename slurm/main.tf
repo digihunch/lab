@@ -1,3 +1,32 @@
+variable "resource_prefix" {
+  type    = string
+  default = "base"
+}
+
+variable "vpc_id" {
+  type = string
+  default = "vpc-004646ac522c171c0"
+}
+
+variable "subnet_tags" {
+  type = map(string)
+  default = {
+    Purpose = "Node"
+  }
+}
+
+data aws_subnets base_subnets {
+  filter {
+    name = "vpc-id"
+    values = [var.vpc_id]
+  }
+  tags = var.subnet_tags
+}
+
+data "aws_vpc" "base" {
+  id = var.vpc_id
+}
+
 locals {
   control_node = {
     instance_type = "t3.medium"
@@ -14,10 +43,22 @@ locals {
   }
 }
 
+data "aws_region" "this" {}
+
+data "cloudinit_config" "slurm_userdata" {
+  base64_encode = true
+  part {
+    content_type = "text/x-shellscript"
+    content = templatefile("${path.module}/template/userdata.tpl", {
+      aws_region = data.aws_region.this.name
+    })
+  }
+}
+
 resource "aws_security_group" "slurm_node_sg" {
-  name        = "${var.resource_prefix}-slurm-node-sg"
-  description = "security group for slurm cluster nodes"
-  vpc_id      = aws_vpc.base.id
+    name        = "${var.resource_prefix}-slurm-node-sg"
+    description = "security group for slurm cluster nodes"
+    vpc_id      = data.aws_vpc.base.id
 
   egress {
     description = "Outbound"
@@ -31,14 +72,14 @@ resource "aws_security_group" "slurm_node_sg" {
     from_port = 6817
     to_port = 6818
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.base.cidr_block]
+    cidr_blocks = [data.aws_vpc.base.cidr_block]
   }
   ingress {
     description = "Inbound SSH"
     from_port = 22
     to_port = 22
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.base.cidr_block]
+    cidr_blocks = [data.aws_vpc.base.cidr_block]
   }
   tags = { Name = "${var.resource_prefix}-SlurmNodeSecurityGroup" }
 }
@@ -90,9 +131,8 @@ data "aws_ami" "slurm_node_ami" {
 
 resource "aws_launch_template" "slurm_control_node_launch_template" {
   name          = "${var.resource_prefix}-slurm-control-node-launch-template"
-  key_name      = aws_key_pair.ssh_pubkey.key_name
   instance_type = local.control_node.instance_type
-  user_data     = data.cloudinit_config.bastion_cloudinit.rendered
+  user_data     = data.cloudinit_config.slurm_userdata.rendered
   image_id      = data.aws_ami.slurm_node_ami.id
 
   iam_instance_profile {
@@ -123,7 +163,7 @@ resource "aws_launch_template" "slurm_control_node_launch_template" {
 
 resource "aws_instance" "control_node" {
     ebs_optimized = true
-    subnet_id = aws_subnet.internal_subnets[0].id
+    subnet_id = data.aws_subnets.base_subnets.ids[0]
     launch_template {
       id = aws_launch_template.slurm_control_node_launch_template.id
       version = "$Latest"
@@ -133,9 +173,8 @@ resource "aws_instance" "control_node" {
 resource "aws_launch_template" "slurm_compute_nodegroup_launch_template" {
     for_each = { for idx, rec in local.compute_node : idx => rec }
     name          = "${var.resource_prefix}-slurm-launch-template-${each.key}"
-    key_name      = aws_key_pair.ssh_pubkey.key_name
     instance_type = each.value.instance_type
-    user_data     = data.cloudinit_config.bastion_cloudinit.rendered
+    user_data     = data.cloudinit_config.slurm_userdata.rendered
     image_id      = data.aws_ami.slurm_node_ami.id
 
     iam_instance_profile {
@@ -165,7 +204,7 @@ resource "aws_launch_template" "slurm_compute_nodegroup_launch_template" {
 
 resource "aws_autoscaling_group" "slurm_compute_nodegroup_asg" {
     for_each = aws_launch_template.slurm_compute_nodegroup_launch_template
-    vpc_zone_identifier = [for subnet in aws_subnet.internal_subnets : subnet.id]
+    vpc_zone_identifier = data.aws_subnets.base_subnets.ids
     desired_capacity    = local.compute_node[each.key].size
     max_size            = local.compute_node[each.key].size
     min_size            = local.compute_node[each.key].size
