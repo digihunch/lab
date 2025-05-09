@@ -1,32 +1,3 @@
-variable "resource_prefix" {
-  type    = string
-  default = "base"
-}
-
-variable "vpc_id" {
-  type = string
-  default = "vpc-004646ac522c171c0"
-}
-
-variable "subnet_tags" {
-  type = map(string)
-  default = {
-    Purpose = "Node"
-  }
-}
-
-data aws_subnets base_subnets {
-  filter {
-    name = "vpc-id"
-    values = [var.vpc_id]
-  }
-  tags = var.subnet_tags
-}
-
-data "aws_vpc" "base" {
-  id = var.vpc_id
-}
-
 locals {
   control_node = {
     instance_type = "t3.medium"
@@ -43,16 +14,38 @@ locals {
   }
 }
 
-data "aws_region" "this" {}
+variable "resource_prefix" {
+  type    = string
+  default = "slurm"
+}
 
-data "cloudinit_config" "slurm_userdata" {
-  base64_encode = true
-  part {
-    content_type = "text/x-shellscript"
-    content = templatefile("${path.module}/template/userdata.tpl", {
-      aws_region = data.aws_region.this.name
-    })
+variable "vpc_id" {
+  type = string
+  default = "vpc-004646ac522c171c0"
+}
+
+variable "subnet_tags" {
+  type = map(string)
+  default = {
+    Purpose = "Node"
   }
+}
+
+resource "tls_private_key" "ssh_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+resource local_file private_key {
+  filename = "${path.module}/out/id_rsa"
+  content = tls_private_key.ssh_key.private_key_pem
+  #file_permission = "0600"
+}
+
+resource local_file public_key {
+  filename = "${path.module}/out/id_rsa.pub"
+  content  = tls_private_key.ssh_key.public_key_openssh
+  #file_permission = "0644"
 }
 
 resource "aws_security_group" "slurm_node_sg" {
@@ -110,23 +103,6 @@ resource "aws_iam_role_policy_attachment" "slurm_role_ssm_policy_attachment" {
 resource "aws_iam_instance_profile" "slurm_inst_profile" {
   name = "${var.resource_prefix}-slurm-inst-profile"
   role = aws_iam_role.slurm_instance_role.name
-}
-
-data "aws_ami" "slurm_node_ami" {
-  most_recent = true
-  owners      = ["amazon"]
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
-  }
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-  filter {
-    name   = "architecture"
-    values = ["x86_64"]
-  }
 }
 
 resource "aws_launch_template" "slurm_control_node_launch_template" {
@@ -196,8 +172,8 @@ resource "aws_launch_template" "slurm_compute_nodegroup_launch_template" {
         resource_type = "instance"
         tags = {
             prefix  = var.resource_prefix
-            purpose = "slurm-control-node"
-            Name    = "${var.resource_prefix}-control-node"
+            purpose = "slurm-compute-node"
+            Name    = "${var.resource_prefix}-compute-${each.key}"
         }
     }
 }
