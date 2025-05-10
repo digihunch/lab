@@ -1,6 +1,6 @@
-data aws_subnets base_subnets {
+data "aws_subnets" "base_subnets" {
   filter {
-    name = "vpc-id"
+    name   = "vpc-id"
     values = [var.vpc_id]
   }
   tags = var.subnet_tags
@@ -12,12 +12,32 @@ data "aws_vpc" "base" {
 
 data "aws_region" "this" {}
 
-data "cloudinit_config" "slurm_userdata" {
+data "cloudinit_config" "slurm_userdata_control_node" {
   base64_encode = true
   part {
     content_type = "text/x-shellscript"
-    content = templatefile("${path.module}/template/userdata.tpl", {
-      aws_region = data.aws_region.this.name
+    content      = file("${path.module}/template/userdata_common.sh")
+  }
+  part {
+    content_type = "text/x-shellscript"
+    content = templatefile("${path.module}/template/userdata_control_node.tpl", {
+      aws_region      = data.aws_region.this.name
+      pubkey_content  = tls_private_key.ssh_key.public_key_openssh
+      privkey_content = tls_private_key.ssh_key.private_key_pem
+    })
+  }
+}
+
+data "cloudinit_config" "slurm_userdata_compute_node" {
+  base64_encode = true
+  part {
+    content_type = "text/x-shellscript"
+    content      = file("${path.module}/template/userdata_common.sh")
+  }
+  part {
+    content_type = "text/x-shellscript"
+    content = templatefile("${path.module}/template/userdata_compute_node.tpl", {
+      aws_region     = data.aws_region.this.name
       pubkey_content = tls_private_key.ssh_key.public_key_openssh
     })
   }
