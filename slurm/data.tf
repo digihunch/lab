@@ -24,6 +24,7 @@ data "cloudinit_config" "slurm_userdata_control_node" {
       aws_region      = data.aws_region.this.name
       pubkey_content  = tls_private_key.ssh_key.public_key_openssh
       privkey_content = tls_private_key.ssh_key.private_key_pem
+      authkey_content = file("~/.ssh/id_rsa.pub")
     })
   }
 }
@@ -48,7 +49,7 @@ data "aws_ami" "slurm_node_ami" {
   owners      = ["amazon"]
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
   }
   filter {
     name   = "virtualization-type"
@@ -58,4 +59,17 @@ data "aws_ami" "slurm_node_ami" {
     name   = "architecture"
     values = ["x86_64"]
   }
+}
+
+data "aws_instances" "asg_members" {
+  depends_on = [aws_autoscaling_group.slurm_compute_nodegroup_asg]
+  for_each   = local.compute_node
+  filter {
+    name   = "tag:nodegroup"
+    values = [each.key]
+  }
+  #filter {
+  #  name   = "instance-state-name"
+  #  values = ["running"]
+  #}
 }

@@ -6,6 +6,5 @@ runuser -l slurm -c '
   echo "${pubkey_content}" > ~/.ssh/authorized_keys && \
   echo export AWS_REGION=${aws_region} >> ~/.bashrc
 '
-sed -i 's/Bootstrapping in progress/Bootstrapping completed/g' /etc/motd
 
 echo "Leaving script $0"

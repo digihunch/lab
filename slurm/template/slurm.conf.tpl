@@ -13,10 +13,10 @@ PartitionName=${k} Nodes=${join(",",v)} Default=YES MaxTime=INFINITE State=UP
 #ConstrainRAMSpace=no
 
 # Logging and state
-SlurmUser=slurm
-SlurmdUser=slurm
-StateSaveLocation=/var/spool/slurmctld
-SlurmdSpoolDir=/var/spool/slurmd
+SlurmUser=root
+SlurmdUser=root
+StateSaveLocation=/var/spool/slurm/slurmctld
+SlurmdSpoolDir=/var/spool/slurm/slurmd
 SlurmctldLogFile=/var/log/slurm/slurmctld.log
 SlurmdDebug=debug
 SlurmdLogFile=/var/log/slurm/slurmd.log
@@ -33,6 +33,6 @@ SlurmctldPort=6817
 SlurmdPort=6818
 
 # Scheduling
-SchedulerType=sched/backfill
-SelectType=select/cons_res
-SelectTypeParameters=CR_Core_Memory
+#SchedulerType=sched/backfill
+#SelectType=select/cons_res
+#SelectTypeParameters=CR_Core_Memory

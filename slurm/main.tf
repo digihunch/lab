@@ -182,25 +182,6 @@ resource "aws_autoscaling_group" "slurm_compute_nodegroup_asg" {
   }
 }
 
-data "aws_instances" "asg_members" {
-  for_each = local.compute_node
-  filter {
-    name   = "tag:nodegroup"
-    values = [each.key]
-  }
-}
-
-#locals {
-#  provisioned_control_node  = "ip-${replace(aws_instance.control_node.private_ip, ".", "-")}"
-#  provisioned_compute_nodes = { for k, v in data.aws_instances.asg_members : k => [for ip in v.private_ips : "ip-${replace(ip, ".", "-")}"] }
-#}
-#output "control_node" {
-#  value = local.provisioned_control_node
-#}
-#output "compute_nodes" {
-#  value = flatten([for ip in local.provisioned_compute_nodes : ip])
-#}
-
 resource "local_file" "slurm_conf" {
   filename = "${path.module}/out/slurm.conf"
   content = templatefile("${path.module}/template/slurm.conf.tpl", {
@@ -209,4 +190,8 @@ resource "local_file" "slurm_conf" {
   })
   file_permission      = "0644"
   directory_permission = "0755"
+}
+
+output "control_instance" {
+  value = aws_instance.control_node.id
 }
