@@ -13,8 +13,8 @@ PartitionName=${k} Nodes=${join(",",v)} Default=YES MaxTime=INFINITE State=UP
 #ConstrainRAMSpace=no
 
 # Logging and state
-SlurmUser=root
-SlurmdUser=root
+SlurmUser=slurm
+#SlurmdUser=root
 StateSaveLocation=/var/spool/slurm/slurmctld
 SlurmdSpoolDir=/var/spool/slurm/slurmd
 SlurmctldLogFile=/var/log/slurm/slurmctld.log
