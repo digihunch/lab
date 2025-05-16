@@ -3,12 +3,12 @@ locals {
     instance_type = "t3.medium"
   }
   compute_node = {
-    node_group_1 = {
-      instance_type = "t3.medium"
+    ng_1 = {
+      instance_type = "c5.2xlarge"
       size          = 2
     }
-    node_group_2 = {
-      instance_type = "t3.medium"
+    ng_2 = {
+      instance_type = "g4dn.xlarge"
       size          = 2
     }
   }
@@ -192,6 +192,10 @@ resource "local_file" "slurm_conf" {
   directory_permission = "0755"
 }
 
-output "control_instance" {
-  value = aws_instance.control_node.id
+output "HEAD_NODE" {
+  value = "slurm@${aws_instance.control_node.id}"
+}
+
+output "NODE_HOST_LIST" {
+  value = "${join(" ",flatten([ for k, v in data.aws_instances.asg_members : [for ip in v.private_ips : "ip-${replace(ip, ".", "-")}"] ]))}"
 }
